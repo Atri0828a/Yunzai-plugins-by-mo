@@ -8,6 +8,10 @@
 原作者[**@枫林**](https://gitee.com/fenglinit)  ，本人获得允许的情况下进行二改  
 具体信息请查阅仓库，地址：[**点这里**](https://github.com/Atri0828a/Yunzai-deepseekAI)
 
+## 网页截图
+对网址进行截图预览  
+指令：消息含有网址即可，此外为了应对部分特殊网址，还附有手动截图模式（#网页截图XXX）
+
 ## Doro结局
 抽取你的Doro结局  
 指令：#今日doro结局  
