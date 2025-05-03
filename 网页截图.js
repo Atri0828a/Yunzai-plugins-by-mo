@@ -5,6 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const MAX_SCREENSHOT_AGE_DAYS = 7; // 保留7天内的截图
+
 // **获取当前文件的目录**
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +21,9 @@ if (!fs.existsSync(SCREENSHOT_DIR)) {
 
 // **网页截图函数**
 async function captureScreenshot(url, filename) {
+    // 先清理旧截图
+    await cleanupOldScreenshots();
+    
     const browser = await puppeteer.launch({ headless: 'new' });
     const page = await browser.newPage();
 
@@ -30,6 +35,28 @@ async function captureScreenshot(url, filename) {
         console.error('截图失败:', error);
     } finally {
         await browser.close();
+    }
+}
+
+// 清理旧截图函数
+async function cleanupOldScreenshots() {
+    try {
+        const files = fs.readdirSync(SCREENSHOT_DIR);
+        const now = Date.now();
+        const cutoff = now - (MAX_SCREENSHOT_AGE_DAYS * 24 * 60 * 60 * 1000);
+        
+        files.forEach(file => {
+            if (file.startsWith('screenshot_') && file.endsWith('.png')) {
+                const filePath = path.join(SCREENSHOT_DIR, file);
+                const stats = fs.statSync(filePath);
+                if (stats.mtimeMs < cutoff) {
+                    fs.unlinkSync(filePath);
+                    console.log('删除旧截图:', file);
+                }
+            }
+        });
+    } catch (error) {
+        console.error('清理旧截图时出错:', error);
     }
 }
 
@@ -45,7 +72,7 @@ export class AutoWebScreenshot extends plugin {
             name: '自动网页截图',
             dsc: '检测消息中的链接并自动截图',
             event: 'message',
-            priority: 100000,
+            priority: 30000000,
             rule: [
                 { reg: manualUrlRegex, fnc: 'manualCaptureWebScreenshot' }, // 手动模式
                 { reg: autoUrlRegex, fnc: 'autoCaptureWebScreenshot' }  // 自动模式
