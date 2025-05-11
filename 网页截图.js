@@ -87,6 +87,7 @@ async autoCaptureWebScreenshot(e) {
     if (e.msg.startsWith("{") && e.msg.includes('":')) return;
     if (e.msg.startsWith("```")) return;
     if (e.msg.length > 500) return;
+    if (e.msg.includes('[CQ:')) return; // 避免识别富媒体消息
     
     const match = e.msg.match(autoUrlRegex);
     if (!match) return;
