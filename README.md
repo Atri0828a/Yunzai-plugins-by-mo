@@ -6,7 +6,12 @@
 ## deepseekAI
 调用deepseek api进行AI对话  
 原作者[**@枫林**](https://gitee.com/fenglinit)  ，本人获得允许的情况下进行二改  
-具体信息请查阅仓库，地址：[**点这里**](https://github.com/Atri0828a/Yunzai-deepseekAI)
+具体信息请查阅仓库，地址：[**点这里**](https://github.com/Atri0828a/Yunzai-deepseekAI)  
+
+## 取信息  
+提取一条消息的所有信息，比如图片的外显，图链等，支持图片，语音，视频，卡片，文本等  
+指令：#取  
+仅在trss崽icqq协议端进行过可行性测试，其它框架与协议自行测试  
 
 ## 网页截图
 对网址进行截图预览  
@@ -14,7 +19,8 @@
 
 ## 主人列表
 查看机器人的主人是谁  
-指令：#主人列表
+指令：#主人列表  
+仅在trss崽测试过，其它框架如喵崽由于配置文件有些许不同，可能无法使用，请自行测试
 
 ## Doro结局
 抽取你的Doro结局  
@@ -26,3 +32,4 @@
 你转生成为一名国男，请选择你的结局  
 指令：#开始国男大冒险  
 改编自[**Fengzi2333**](https://github.com/Fengzi2333)的项目[**GuoNanSimulator**](https://github.com/Fengzi2333/GuoNanSimulator)
+
