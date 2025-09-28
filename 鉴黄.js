@@ -3,6 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 
+import axios from 'axios';
+import got from 'got';
+import puppeteer from 'puppeteer';
+
 let isRunning = false;   // 全局锁
 let timeoutTimer = null; // 超时定时器
 
@@ -22,33 +26,84 @@ export class jianhuang extends plugin {
     });
   }
 
-// 直接用 puppeteer 截图 URL（由于一些蜜汁原因，我尝试过axios，got，fetch下载图片，均有概率下载失败，只能出此下策，若有大佬能够帮助我解决我感激不尽）
-async downloadImage(url, destPath) {
-  logger.info(`开始截图图片: ${url}`);
-  const puppeteer = (await import('puppeteer')).default;
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
 
-  const page = await browser.newPage();
-  // 打开图片直链
-  await page.goto(url, { waitUntil: "networkidle2", timeout: 0 });
+  // 并行下载
+  async downloadImage(url, destPath) {
+  logger.info(`开始并行下载图片: ${url}`);
 
-  // 截图整个页面
-  const buffer = await page.screenshot({ fullPage: true });
+  const controllers = {
+    axios: new AbortController(),
+    got: new AbortController(),
+  };
+  let puppeteerBrowser = null;
 
-  await browser.close();
+  // axios 方案
+  const axiosTask = (async () => {
+    const res = await axios.get(url, {
+      responseType: "arraybuffer",
+      signal: controllers.axios.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://q.qpic.cn",
+      },
+      timeout: 30000,
+    });
+    return Buffer.from(res.data);
+  })();
 
-  // 存储到本地文件
-  await Bot.mkdir(path.dirname(destPath));
-  await fs.promises.writeFile(destPath, buffer);
+  // got 方案
+  const gotTask = (async () => {
+    const buffer = await got(url, {
+      signal: controllers.got.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://q.qpic.cn",
+      },
+      timeout: { request: 30000 },
+      retry: { limit: 1 },
+    }).buffer();
+    return buffer;
+  })();
 
-  logger.info(`截图完成: ${(buffer.length / 1024).toFixed(1)} KB -> ${destPath}`);
+  // puppeteer 截图方案
+  const puppeteerTask = (async () => {
+    puppeteerBrowser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await puppeteerBrowser.newPage();
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 });
+    const buffer = await page.screenshot({ fullPage: true, type: "jpeg", quality: 90 });
+    return buffer;
+  })();
+
+  try {
+    const buffer = await Promise.any([axiosTask, gotTask, puppeteerTask]);
+
+    // 成功后取消其他任务
+    controllers.axios.abort();
+    controllers.got.abort();
+    if (puppeteerBrowser) {
+      try { await puppeteerBrowser.close(); } catch {}
+    }
+
+    if (!buffer || buffer.length === 0) throw new Error("下载失败，未获取到有效 Buffer");
+
+    await Bot.mkdir(path.dirname(destPath));
+    await fs.promises.writeFile(destPath, buffer);
+
+    const stat = fs.statSync(destPath);
+    logger.info(`图片下载完成: ${(stat.size / 1024).toFixed(1)} KB -> ${destPath}`);
+  } catch (err) {
+    logger.error(`图片下载失败: ${err.message}`);
+    // 确保清理 Puppeteer
+    if (puppeteerBrowser) {
+      try { await puppeteerBrowser.close(); } catch {}
+    }
+    throw err;
+  }
 }
-
-
 
 
   // 压缩图片
@@ -58,7 +113,7 @@ async downloadImage(url, destPath) {
     let quality = 90;
     let compressedBuffer = await sharp(buffer).jpeg({ quality }).toBuffer();
 
-    while (compressedBuffer.length > 500 * 1024 && quality > 20) {
+    while (compressedBuffer.length > 300 * 1024 && quality > 10) {
       logger.info(`压缩循环: 当前大小=${(compressedBuffer.length / 1024).toFixed(1)}KB, 降低质量=${quality}`);
       quality -= 10;
       compressedBuffer = await sharp(buffer).jpeg({ quality }).toBuffer();
@@ -103,11 +158,11 @@ async downloadImage(url, destPath) {
     }
     isRunning = true;
 
-    // 设置超时（60秒）
+    // 设置超时（120秒）
     timeoutTimer = setTimeout(async () => {
       isRunning = false;
       await e.reply('鉴定超时失败，请稍后重试');
-    }, 60 * 1000);
+    }, 120 * 1000);
 
     let imgUrls = await this.getImageUrls(e);
     if (imgUrls.length === 0) {
@@ -133,7 +188,6 @@ async downloadImage(url, destPath) {
       }
     }
 
-    // 本次任务的文件路径
     const tmpPath = path.join(resDir, 'tmp_nsfw.jpg');
     const compressedPath = path.join(resDir, 'tmp_nsfw_compressed.jpg');
 
@@ -144,51 +198,57 @@ async downloadImage(url, destPath) {
       logger.info('开始压缩图片');
       await this.compressImage(tmpPath, compressedPath);
 
-      // Puppeteer 处理
-      logger.info('启动 Puppeteer');
-      const puppeteer = (await import('puppeteer')).default;
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--single-process',
-          '--disable-gpu'
-        ],
-        ignoreDefaultArgs: ['--enable-automation']
-      });
+      // Puppeteer 处理（上传到 magiconch）
+logger.info('启动 Puppeteer');
+const browser = await puppeteer.launch({
+  headless: true,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--single-process',
+    '--disable-gpu'
+  ],
+  ignoreDefaultArgs: ['--enable-automation']
+});
 
-      const page = await browser.newPage();
-      logger.info('打开目标页面');
-      await page.goto('https://magiconch.com/nsfw/', {
-        waitUntil: 'networkidle2',
-        timeout: 0
-      });
+try {
+  const page = await browser.newPage();
 
-      logger.info('选择文件并上传');
-      const [fileChooser] = await Promise.all([
-        page.waitForFileChooser({ timeout: 0 }),
-        page.click('#up')
-      ]);
+  logger.info('打开目标页面');
+  await page.goto('https://magiconch.com/nsfw/', {
+    waitUntil: 'networkidle2',
+    timeout: 0
+  });
 
-      await fileChooser.accept([compressedPath]);
+  logger.info('等待上传按钮可见');
+  await page.waitForSelector('#up', { visible: true, timeout: 30000 });
 
-      await e.reply('已上传，正在等待结果渲染，请稍候...');
-      logger.info('等待结果渲染 ');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+  logger.info('选择文件并上传');
+  const [fileChooser] = await Promise.all([
+    page.waitForFileChooser({ timeout: 30000 }),
+    page.click('#up')
+  ]);
+  await fileChooser.accept([compressedPath]);
 
-      logger.info('截图页面');
-      const screenshotBuffer = await page.screenshot({ fullPage: true });
-      await e.reply(segment.image(screenshotBuffer));
+  await e.reply('已上传，正在等待结果渲染，请稍候...');
+  await new Promise(resolve => setTimeout(resolve, 35000));
 
-      await browser.close();
-      logger.info('Puppeteer 关闭完成');
+  logger.info('截图页面');
+  const screenshotBuffer = await page.screenshot({ fullPage: true });
+  await e.reply(segment.image(screenshotBuffer));
+
+  await page.close(); // 确保页面关闭
+} finally {
+  await browser.close(); // 确保浏览器彻底关闭
+  await new Promise(r => setTimeout(r, 500)); // 等待资源释放
+}
+logger.info('Puppeteer 关闭完成');
+
     } catch (err) {
       logger.error(`任务失败: ${err.stack}`);
       await e.reply(`鉴定失败：${err.message}`);
     } finally {
-      // 清理，解锁
       clearTimeout(timeoutTimer);
       isRunning = false;
 
@@ -200,4 +260,5 @@ async downloadImage(url, destPath) {
       }
     }
   }
+
 }
