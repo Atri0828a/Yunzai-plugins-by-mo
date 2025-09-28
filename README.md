@@ -15,7 +15,7 @@
 仅在trss崽icqq协议端进行过可行性测试，其它框架与协议自行测试  
 
 ## 鉴黄  
-对一张图片的涩情程度进行判断  
+对一张图片的涩情程度进行判断（娱乐向）  
 指令：#鉴黄  
 项目改编自免费的[**在线鉴黄工具**](https://magiconch.com/nsfw/)  
 
@@ -38,5 +38,6 @@
 你转生成为一名国男，请选择你的结局  
 指令：#开始国男大冒险  
 改编自[**Fengzi2333**](https://github.com/Fengzi2333)的项目[**GuoNanSimulator**](https://github.com/Fengzi2333/GuoNanSimulator)
+
 
 
