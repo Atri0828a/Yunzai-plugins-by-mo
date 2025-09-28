@@ -199,51 +199,45 @@ export class jianhuang extends plugin {
       await this.compressImage(tmpPath, compressedPath);
 
       // Puppeteer 处理（上传到 magiconch）
-logger.info('启动 Puppeteer');
-const browser = await puppeteer.launch({
-  headless: true,
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--single-process',
-    '--disable-gpu'
-  ],
-  ignoreDefaultArgs: ['--enable-automation']
-});
+      logger.info('启动 Puppeteer');
+      const puppeteer = (await import('puppeteer')).default;
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--single-process',
+          '--disable-gpu'
+        ],
+        ignoreDefaultArgs: ['--enable-automation']
+      });
 
-try {
-  const page = await browser.newPage();
+      const page = await browser.newPage();
+      logger.info('打开目标页面');
+      await page.goto('https://magiconch.com/nsfw/', {
+        waitUntil: 'networkidle2',
+        timeout: 0
+      });
 
-  logger.info('打开目标页面');
-  await page.goto('https://magiconch.com/nsfw/', {
-    waitUntil: 'networkidle2',
-    timeout: 0
-  });
+      logger.info('选择文件并上传');
+      const [fileChooser] = await Promise.all([
+        page.waitForFileChooser({ timeout: 0 }),
+        page.click('#up')
+      ]);
 
-  logger.info('等待上传按钮可见');
-  await page.waitForSelector('#up', { visible: true, timeout: 30000 });
+      await fileChooser.accept([compressedPath]);
 
-  logger.info('选择文件并上传');
-  const [fileChooser] = await Promise.all([
-    page.waitForFileChooser({ timeout: 30000 }),
-    page.click('#up')
-  ]);
-  await fileChooser.accept([compressedPath]);
+      await e.reply('已上传，正在等待结果渲染，请稍候...');
+      logger.info('等待结果渲染 ');
+      await new Promise(resolve => setTimeout(resolve, 35000));
 
-  await e.reply('已上传，正在等待结果渲染，请稍候...');
-  await new Promise(resolve => setTimeout(resolve, 35000));
+      logger.info('截图页面');
+      const screenshotBuffer = await page.screenshot({ fullPage: true });
+      await e.reply(segment.image(screenshotBuffer));
 
-  logger.info('截图页面');
-  const screenshotBuffer = await page.screenshot({ fullPage: true });
-  await e.reply(segment.image(screenshotBuffer));
-
-  await page.close(); // 确保页面关闭
-} finally {
-  await browser.close(); // 确保浏览器彻底关闭
-  await new Promise(r => setTimeout(r, 500)); // 等待资源释放
-}
-logger.info('Puppeteer 关闭完成');
+      await browser.close();
+      logger.info('Puppeteer 关闭完成');
 
     } catch (err) {
       logger.error(`任务失败: ${err.stack}`);
@@ -262,3 +256,4 @@ logger.info('Puppeteer 关闭完成');
   }
 
 }
+
