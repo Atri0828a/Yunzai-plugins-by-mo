@@ -30,9 +30,9 @@ async function captureScreenshot(url, filename) {
     try {
         await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
         await page.screenshot({ path: filename, fullPage: true });
-        console.log('截图完成:', filename);
+        logger.info('截图完成:', filename);
     } catch (error) {
-        console.error('截图失败:', error);
+        logger.error('截图失败:', error);
     } finally {
         await browser.close();
     }
@@ -51,12 +51,12 @@ async function cleanupOldScreenshots() {
                 const stats = fs.statSync(filePath);
                 if (stats.mtimeMs < cutoff) {
                     fs.unlinkSync(filePath);
-                    console.log('删除旧截图:', file);
+                    logger.info('删除旧截图:', file);
                 }
             }
         });
     } catch (error) {
-        console.error('清理旧截图时出错:', error);
+        logger.error('清理旧截图时出错:', error);
     }
 }
 
@@ -101,13 +101,13 @@ async autoCaptureWebScreenshot(e) {
 
     let filename = path.join(SCREENSHOT_DIR, `screenshot_${Date.now()}.png`);
 
-    await e.reply(`检测到网址：${url}，正在截图...`);
+    logger.info(`检测到网址：${url}，正在截图...`);
     await captureScreenshot(url, filename);
 
     if (fs.existsSync(filename)) {
         await e.reply(segment.image(filename));
     } else {
-        await e.reply('截图失败，请检查网址是否有效。');
+        logger.error('截图失败，请检查网址是否有效。');
     }
 }
 
