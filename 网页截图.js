@@ -19,6 +19,116 @@ if (!fs.existsSync(SCREENSHOT_DIR)) {
     fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 }
 
+// 无需截图的域名（这部分是用AI列举的，有错加或者漏加的请自己根据需求改）
+const NO_SCREENSHOT_DOMAINS = [
+    /* ===== 短链跳转类 ===== */
+    't.cn',
+    'url.cn',
+    'dwz.cn',
+    'dwz.win',
+    'bit.ly',
+    'tinyurl.com',
+    'goo.gl',
+    'vk.cc',
+    'qr.alipay.com',
+    'u.jd.com',
+    'jdshare.com',
+    'tb.cn',
+    'e.tb.cn',
+
+    /* ===== 电商跳转统计类 ===== */
+    's.click.taobao.com',
+    'g.click.taobao.com',
+    'mclick.simba.taobao.com',
+    'click.mz.simba.taobao.com',
+    'uland.taobao.com',
+    'rec.m.jd.com',
+    'stat.m.jd.com',
+
+    /* ===== API 接口类 ===== */
+    'api.bilibili.com',
+    'api.github.com',
+    'api.m.jd.com',
+    'api.weibo.com',
+    'api.douyin.com',
+    'api.tiktok.com',
+    'openapi.alipay.com',
+    'openapi.weixin.qq.com',
+
+    /* ===== CDN / 静态资源 ===== */
+    'alicdn.com',
+    'alibabausercontent.com',
+    'biliimg.com',
+    'hdslb.com',
+    'gstatic.com',
+    'cloudflare.com',
+    'cdnjs.cloudflare.com',
+    'jsdelivr.net',
+    'qlogo.cn',
+    'qnimg.com',
+    'meituan.net',
+    'csdnimg.cn',
+    'githubusercontent.com',
+    'steamstatic.com',
+
+    /* ===== 视频站点（高几率反爬） ===== */
+    'v.qq.com',
+    'youku.com',
+    'iqiyi.com',
+    'mgtv.com',
+    'douyin.com',
+    'tiktok.com',
+    'bilibili.com', // 播放页
+
+    /* ===== 内网 & 穿透服务 ===== */
+    'frp-fun.com',
+    'frp-gap.com',
+    'natfrp.com',
+    'natapp.cn',
+    'natappfree.com',
+    'freefrp.net',
+    'frp.run',
+    'ngrok.io',
+    'localhost',
+    '127.0.0.1',
+    '.lan',
+    '.internal',
+
+    /* ===== 广告跳转 & 追踪 ===== */
+    'doubleclick.net',
+    'googlesyndication.com',
+    'adservice.google.com',
+    'scorecardresearch.com',
+    'cr-nielsen.com',
+
+    /* ===== 安全拦截页 ===== */
+    'safe.sankuai.com',
+    'antivirus.baidu.com',
+    'urlsec.qq.com',
+    'guanjia.qq.com',
+
+    /* ===== 移动 APP 跳转 ===== */
+    'l.instagram.com',
+    'l.facebook.com',
+    'l.tiktok.com',
+    'lnk0.com',
+    'at.umeng.com',
+    'app.adjust.com',
+    'appsflyer.com'
+];
+
+
+// 判断是否属于无需截图域名
+function isNoScreenshot(url) {
+    try {
+        const hostname = new URL(url).hostname;
+        return NO_SCREENSHOT_DOMAINS.some(d => hostname.includes(d));
+    } catch (err) {
+        return false;
+    }
+}
+
+
 // **网页截图函数**
 async function captureScreenshot(url, filename) {
     // 先清理旧截图
@@ -97,6 +207,12 @@ async autoCaptureWebScreenshot(e) {
     // **如果网址没有 http，就加上默认的 http://**
     if (!/^https?:\/\//.test(url)) {
         url = 'http://' + url;
+    }
+
+    // 白名单过滤
+    if (isNoScreenshot(url)) {
+        logger.info(`跳过无需截图域名：${url}`);
+        return;
     }
 
     let filename = path.join(SCREENSHOT_DIR, `screenshot_${Date.now()}.png`);
