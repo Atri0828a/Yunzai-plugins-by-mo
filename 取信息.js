@@ -20,22 +20,39 @@ export class getMsgInfo extends plugin {
     let msgList = []
 
     // 1. 如果是回复消息 → 优先取被回复的消息内容
-    if (e.source) {
-      try {
-        let replyMsg
-        if (e.isGroup) {
-          replyMsg = await e.group.getChatHistory(e.source.seq, 1)
-        } else {
-          replyMsg = await e.friend.getChatHistory(e.source.time, 1)
-        }
+if (e.source || e.message?.some(m => m.type === 'reply')) {
+  try {
+    let replyMsg
 
-        if (replyMsg && replyMsg[0]?.message) {
-          msgList = [...replyMsg[0].message]
-        }
-      } catch (err) {
-        logger.error('获取被回复消息失败', err)
+    // ===== ICQQ 方式 =====
+    if (e.source) {
+      if (e.isGroup) {
+        replyMsg = await e.group.getChatHistory(e.source.seq, 1)
+      } else {
+        replyMsg = await e.friend.getChatHistory(e.source.time, 1)
       }
     }
+
+    // ===== NapCat / OneBot 方式 =====
+    if (!replyMsg) {
+      const replySeg = e.message.find(m => m.type === 'reply')
+      if (replySeg) {
+        if (e.isGroup) {
+          replyMsg = await e.group.getChatHistory(replySeg.id, 1)
+        } else {
+          replyMsg = await e.friend.getChatHistory(replySeg.id, 1)
+        }
+      }
+    }
+
+    if (replyMsg && replyMsg[0]?.message) {
+      msgList = [...replyMsg[0].message]
+    }
+
+  } catch (err) {
+    logger.error('获取被回复消息失败', err)
+  }
+}
 
     // 2. 如果不是回复，或者回复消息没取到，就用当前消息本身
     if (msgList.length === 0) {
